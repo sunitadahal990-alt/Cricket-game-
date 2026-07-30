@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Cricket - Swing Your Phone!</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            max-width: 420px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #ffeb3b;
+            margin-bottom: 5px;
+        }
+
+        .batsman-name {
+            font-size: 1.2rem;
+            color: #00e676;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 12px;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+        }
+
+        /* Countdown & Bowler Display */
+        .bowler-stage {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer-display {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #ff9800;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .bowler-action {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        #status {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+            min-height: 28px;
+            color: #29b6f6;
+        }
+
+        .instructions {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-top: 15px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>🏏 Motion Cricket</h1>
+        <div class="batsman-name" id="batsman-display">Striker: Virat Kohli</div>
+
+        <div class="scoreboard">
+            <div class="stat-box">
+                <span class="stat-title">Score</span>
+                <span class="stat-value" id="score">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-title">Wickets</span>
+                <span class="stat-value" id="wickets">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-title">Balls</span>
+                <span class="stat-value" id="balls">6</span>
+            </div>
+        </div>
+
+        <div class="bowler-stage">
+            <div class="timer-display" id="timer">-</div>
+            <div class="bowler-action" id="bowler-text">READY</div>
+        </div>
+
+        <div id="status">Press Start to Play!</div>
+
+        <button class="btn" id="start-btn">ENABLE SENSORS & PLAY</button>
+
+        <div class="instructions">
+            <b>Rules (Hard Mode):</b><br>
+            • Listen to the 3-tick countdown (3.. 2.. 1..)<br>
+            • <b>SWING YOUR PHONE HARD</b> right on the release!<br>
+            • Wicket = <b>-10 Runs Penalty!</b>
+        </div>
+    </div>
+
+    <script>
+        // Players
+        const players = ["Virat Kohli", "Rohit Sharma", "Abhishek Sharma"];
+        let currentPlayerIndex = 0;
+
+        // Game State Variables
+        let score = 0;
+        let wickets = 0;
+        let ballsLeft = 6;
+        let isBallInFlight = false;
+        let canHit = false;
+        let swingDetected = false;
+
+        // Web Audio Context
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // DOM Elements
+        const startBtn = document.getElementById('start-btn');
+        const statusEl = document.getElementById('status');
+        const scoreEl = document.getElementById('score');
+        const wicketsEl = document.getElementById('wickets');
+        const ballsEl = document.getElementById('balls');
+        const timerEl = document.getElementById('timer');
+        const bowlerTextEl = document.getElementById('bowler-text');
+        const batsmanDisplay = document.getElementById('batsman-display');
+
+        startBtn.addEventListener('click', async () => {
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
+            // iOS 13+ Motion Permission Request
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') {
+                        setupMotionListener();
+                        resetGame();
+                    } else {
+                        alert('Permission denied for Motion Sensors.');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            } else if ('DeviceMotionEvent' in window) {
+                setupMotionListener();
+                resetGame();
+            } else {
+                alert('Device Motion is not supported on your browser/device.');
+            }
+        });
+
+        function setupMotionListener() {
+            window.addEventListener('devicemotion', (event) => {
+                const acc = event.acceleration || event.accelerationIncludingGravity;
+                if (!acc) return;
+
+                // Force calculation
+                const force = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+
+                // Hard Mode: Needs a fast, powerful swing force (> 24)
+                if (force > 24 && isBallInFlight && canHit && !swingDetected) {
+                    swingDetected = true;
+                    processHit(force);
+                }
+            });
+        }
+
+        function resetGame() {
+            score = 0;
+            wickets = 0;
+            ballsLeft = 6;
+            currentPlayerIndex = 0;
+            updateDisplay();
+            startBtn.style.display = 'none';
+            statusEl.textContent = "Get Ready!";
+            setTimeout(startBowlingSequence, 1500);
+        }
+
+        function startBowlingSequence() {
+            if (ballsLeft <= 0) {
+                endGame();
+                return;
+            }
+
+            swingDetected = false;
+            canHit = false;
+            isBallInFlight = false;
+            statusEl.textContent = "Prepare your swing!";
+            
+            // 3-Tick Countdown Sequence
+            let count = 3;
+            timerEl.textContent = count;
+            bowlerTextEl.textContent = "🏃‍♂️ RUNNING UP...";
+            playTickSound();
+
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    timerEl.textContent = count;
+                    bowlerTextEl.textContent = count === 2 ? "🏃‍♂️ GAINING SPEED..." : "⚡ LOADING DELIVER...";
+                    playTickSound();
+                } else {
+                    clearInterval(countdownInterval);
+                    timerEl.textContent = "🔥";
+                    bowlerTextEl.textContent = "⚾ BALL RELEASED!";
+                    playTickSound(true); // Higher pitched tick for release
+                    
+                    // Ball is now delivered
+                    isBallInFlight = true;
+                    canHit = true;
+
+                    // Hard Mode: Hitting window is only 250 milliseconds!
+                    const hitWindowDuration = 250;
+
+                    setTimeout(() => {
+                        canHit = false;
+                    }, hitWindowDuration);
+
+                    // Check if batter missed
+                    setTimeout(() => {
+                        if (isBallInFlight && !swingDetected) {
+                            processMiss();
+                        }
+                    }, hitWindowDuration + 100);
+                }
+            }, 1000); // 1 tick per second
+        }
+
+        function processHit(force) {
+            isBallInFlight = false;
+            ballsLeft--;
+
+            let runs = 0;
+            if (force > 48) {
+                runs = 6;
+            } else if (force > 38) {
+                runs = 5;
+            } else if (force > 32) {
+                runs = 4;
+            } else if (force > 28) {
+                runs = 3;
+            } else if (force > 25) {
+                runs = 2;
+            } else {
+                runs = 1;
+            }
+
+            score += runs;
+            updateDisplay();
+
+            if (runs === 4 || runs === 6) {
+                statusEl.textContent = `💥 HUGE ${runs} RUNS! WHAT A SHOT!`;
+                playCheerSound();
+            } else {
+                statusEl.textContent = `Pushed for ${runs} run(s)!`;
+                playBatSound();
+            }
+
+            nextBallDelay();
+        }
+
+        function processMiss() {
+            isBallInFlight = false;
+            ballsLeft--;
+
+            // Hard mode: 65% chance of wicket on miss/bad timing
+            const isOut = Math.random() < 0.65;
+
+            if (isOut) {
+                wickets++;
+                score -= 10; // Penalty for losing a wicket
+                statusEl.textContent = "🔴 OUT! Bowled 'Em! (-10 Runs)";
+                playWicketSound();
+                
+                // Rotate Player Name on Wicket
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            } else {
+                statusEl.textContent = "Dot Ball! Swing missed.";
+            }
+
+            updateDisplay();
+            nextBallDelay();
+        }
+
+        function nextBallDelay() {
+            setTimeout(() => {
+                if (ballsLeft > 0) {
+                    startBowlingSequence();
+                } else {
+                    endGame();
+                }
+            }, 2500);
+        }
+
+        function updateDisplay() {
+            scoreEl.textContent = score;
+            wicketsEl.textContent = wickets;
+            ballsEl.textContent = ballsLeft;
+            batsmanDisplay.textContent = `Striker: ${players[currentPlayerIndex]}`;
+        }
+
+        function endGame() {
+            timerEl.textContent = "🏆";
+            bowlerTextEl.textContent = "MATCH OVER";
+            statusEl.textContent = `Final Score: ${score} runs (${wickets} Wickets)`;
+            startBtn.style.display = 'block';
+            startBtn.textContent = 'PLAY AGAIN';
+        }
+
+        // --- WEB AUDIO API (Sound Effects) ---
+        
+        function playTickSound(isFinal = false) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(isFinal ? 880 : 440, audioCtx.currentTime); // Pitch difference
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function playBatSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playWicketSound() {
+            const bufferSize = audioCtx.sampleRate * 0.25;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+            noise.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start();
+        }
+
+        function playCheerSound() {
+            playBatSound();
+            const duration = 2.5;
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(900, audioCtx.currentTime);
+            filter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.01, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 0.3);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            noise.start();
+        }
+    </script>
+</body>
+</html>
